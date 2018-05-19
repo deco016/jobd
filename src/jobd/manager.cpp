@@ -413,6 +413,7 @@ void JobManager::rescheduleJob(unique_ptr<Job>& job) {
 
 		job->restart_after = current_time() +
 			job->manifest.json["ThrottleInterval"].get<unsigned int>();
+		this->handleKeepaliveWakeup();
 	} else {
 		log_debug("marking job as faulted");
 		// Assume that non-KeepAlive jobs are supposed to run forever
