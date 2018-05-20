@@ -102,7 +102,8 @@ void JobManager::defineJob(const string& path)
 
 	job->jobStatus.setLabel(label);
 	job->jobProperty.setLabel(label);
-
+	job->manifest.json["ManifestPath"] = path;
+	
 	// Write the parsed, normalized JSON back out to a file
 	std::ofstream ofile;
 	ofile.open(jobd_config.getManifestDir() + '/' + label + ".json");
@@ -186,6 +187,15 @@ void JobManager::runPendingJobs()
 	}
 }
 
+std::string JobManager::getStatus(const string& label)
+{
+	auto it = jobs.find(label);
+	if (it == jobs.end())
+		return "invalid";
+	unique_ptr<Job>& job = it->second;
+	return job->getStateString();
+}
+
 void JobManager::wakeJob(const string& label)
 {
 	unique_ptr<Job>& job = this->jobs.find(label)->second;
@@ -248,6 +258,29 @@ void JobManager::unloadJob(const string& label) {
 
 	unique_ptr<Job>& job = it->second;
 	this->unloadJob(job);
+}
+
+void JobManager::restartJob(const string& label) {
+	auto it = jobs.find(label);
+	if (it == jobs.end())
+		throw std::invalid_argument("label not found");
+
+	unique_ptr<Job>& job = it->second;
+	job->kill();
+	job->run();
+}
+
+void JobManager::refreshJob(const string& label) {
+	auto it = jobs.find(label);
+	if (it == jobs.end())
+		throw std::invalid_argument("label not found");
+
+	unique_ptr<Job>& job = it->second;
+	std::string manifest_path = job->getManifestPath();
+	job->kill();
+	unloadJob(job);
+	defineJob(manifest_path);
+	runPendingJobs();
 }
 
 void JobManager::unloadAllJobs()
@@ -364,7 +397,7 @@ void JobManager::reapChildProcess(pid_t pid, int status)
 		job->jobStatus.setLastExitStatus(last_exit_status);
 		job->jobStatus.setTermSignal(term_signal);
 		job->jobStatus.setPid(0);
-
+		job->writePidFile();
 		this->rescheduleJob(job);
 	} catch (std::out_of_range& e) {
 		log_warning("child pid %d exited but no job found", pid);

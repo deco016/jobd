@@ -19,11 +19,13 @@ extern "C" {
 #include <grp.h>
 #include <pwd.h>
 #include <sys/types.h>
+
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 
 #ifdef __FreeBSD__
+#include <libutil.h>
 #include <sys/param.h>
 #include <sys/jail.h>
 #endif
@@ -549,7 +551,7 @@ void Job::unload()
 
 	if (this->state == JOB_STATE_RUNNING) {
 		log_debug("sending SIGTERM to process group %d", pid);
-		if (kill(-1 * pid, SIGTERM) < 0) {
+		if (::kill(-1 * pid, SIGTERM) < 0) {
 			log_errno("killpg(2) of pid %d", pid);
 			/* not sure how to handle the error, we still want to clean up */
 		}
@@ -560,7 +562,28 @@ void Job::unload()
 		this->setState(JOB_STATE_DEFINED);
 	}
 }
+void Job::kill()
+{
+	const pid_t pid = this->jobStatus.getPid();
 
+	if (!loaded) {
+		log_warning("tried to unload a job that is already unloaded");
+		return;
+	}
+	if (this->state == JOB_STATE_RUNNING) {
+		log_debug("sending SIGTERM to process group %d", pid);
+		if (::kill(-1 * pid, SIGTERM) < 0) {
+			log_errno("killpg(2) of pid %d", pid);
+			/* not sure how to handle the error, we still want to clean up */
+		}
+		this->setState(JOB_STATE_KILLED);
+		//TODO: start a timer to send a SIGKILL if it doesn't die gracefully
+	}
+}
+const std::string Job::getManifestPath()
+{
+	return manifest.json["ManifestPath"].get<std::string>();
+}
 void Job::acquire_resources() 
 {
 	if (manifest.json.find("ChrootJail") != manifest.json.end()) {
@@ -604,7 +627,40 @@ void Job::run() {
 	pid_t pid;
 	this->acquire_resources();
 	this->lookup_credentials();
-
+	
+	// check for pid file
+	std::string pidfile = this->jobStatus.getPidFile();
+	struct stat	sb;
+	if (stat(pidfile.c_str(), &sb) == 0)
+	{
+		FILE * fp;
+		char buf[256];
+		pid_t _pid = 0;
+		if ((fp = fopen(pidfile.c_str(), "r")))
+		{
+			while (fgets(buf, 256, fp))
+			{
+				if (!*buf)
+					continue;
+				sscanf(buf, "%u", &_pid);
+			}
+			fclose(fp);
+		}
+		log_debug("pid file constants %d", _pid);
+		if(_pid > 0)
+		{
+#ifdef __FreeBSD__
+			struct kinfo_proc *proc = kinfo_getproc(_pid);
+			log_debug("Checking pid status %d", _pid);
+			if (proc) {
+				log_info("label %s already running with pid %d", this->getLabel().c_str(), _pid);
+				free(proc);	
+				this->setJobRuning(_pid);			
+				return;
+			}
+#endif
+		}
+	}
 	// This is useful for debugging errors that prevent exec()
 	if (this->manager->isNoFork()) {
 		pid = 0;
@@ -628,11 +684,8 @@ void Job::run() {
 			exit(124);
 		}
 	} else {
-		this->jobStatus.setPid(pid);
 		log_debug("job %s started with pid %d", this->label.c_str(), pid);
-		this->setState(JOB_STATE_RUNNING);
-		this->restart_after = 0;
-		manager->createProcessEventWatch(pid);
+		this->setJobRuning(pid);
 		// FIXME: close descriptors that the master process no longer needs
 #if 0
 		SLIST_FOREACH(jms, &job->jm->sockets, entry) {
@@ -642,6 +695,39 @@ void Job::run() {
 	}
 }
 
+void Job::setJobRuning(pid_t pid)
+{
+	this->jobStatus.setPid(pid);
+	this->setState(JOB_STATE_RUNNING);
+	this->restart_after = 0;
+	this->writePidFile();
+	manager->createProcessEventWatch(pid);
+}
+
+void Job::writePidFile()
+{
+	string pid_file = this->manifest.json["PidFile"];
+	if (pid_file.length()) {
+		pid_t pid = this->jobStatus.getPid();
+		if(!pid)
+		{
+			remove(pid_file.c_str());
+			log_debug("removing pid file. (filename: %s)", pid_file.c_str());
+		}else{
+			FILE*	fp;
+			if ((fp = fopen(pid_file.c_str(), "w+")))
+			{
+				this->jobStatus.setPidFile(pid_file);
+				fprintf(fp, "%d", pid);
+				fclose(fp);
+				log_debug("writing pid to file. (filename: %s)", pid_file.c_str());
+			
+			}
+			else
+				log_error("Could not open file for writing. (filename: %s)", pid_file.c_str());
+		}
+	}
+}
 void Job::clearFault()
 {
 	if (this->isFaulted()) {

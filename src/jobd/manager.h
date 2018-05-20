@@ -32,6 +32,9 @@ public:
 	void enableJob(const string& label);
 	void unloadJob(const string& label);
 	void clearJob(const string& label);
+	void restartJob(const string& label);
+	void refreshJob(const string& label);
+	std::string getStatus(const string& label);
 	void defineJob(const string& path);
 	void unloadAllJobs();
 	void listAllJobs(nlohmann::json& result);

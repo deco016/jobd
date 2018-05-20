@@ -87,13 +87,14 @@ void dispatch_request(std::string label, std::string command)
 	request.setMethod(command);
 	request.addParam(label);
 
-	if (command == "restart" || command == "mark") {
+	if (command == "mark") {
 		puts("ERROR: Command not implemented yet");
 		exit(1);
 	}
 
 	ipc_client->dispatch(request, response);
 	//TODO: handle response
+	std::cout << response.dump() << std::endl;
 }
 
 int

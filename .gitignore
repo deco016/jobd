@@ -22,3 +22,5 @@ depends.mk
 
 # Manpage-to-HTML
 *.[12345678].html
+sync.sh
+.vscode/settings.json

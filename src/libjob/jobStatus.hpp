@@ -32,6 +32,7 @@ public:
 		          {
                           "JobStatusAPI": 0,
                           "Pid": 0,
+                          "PidFile": "",
                           "LastExitStatus": 0,
                           "TermSignal": 0
                           }
@@ -71,6 +72,17 @@ public:
 	void setTermSignal(int termSignal)
 	{
 		this->json["TermSignal"] = termSignal;
+		this->sync();
+	}
+
+	std::string getPidFile() const
+	{
+		return this->json["PidFile"].get<std::string>();
+	}
+
+	void setPidFile(std::string termSignal)
+	{
+		this->json["PidFile"] = termSignal;
 		this->sync();
 	}
 

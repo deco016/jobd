@@ -129,10 +129,10 @@ void Manifest::readFile(const string path)
 void Manifest::normalize() {
 	auto default_json = R"(
 	  {
-            "ChrootDirectory": null,
-            "Description": "",
-            "EnableGlobbing": false,
-            "EnvironmentVariables": [],
+		"ChrootDirectory": null,
+		"Description": "",
+		"EnableGlobbing": false,
+		"EnvironmentVariables": [],
 	    "KeepAlive": false,
 	    "Nice": 0,            
 	    "InitGroups": true,
@@ -163,7 +163,12 @@ void Manifest::normalize() {
 		struct group *grp = getgrgid(getgid());
 		this->json["GroupName"] = string(grp->gr_name);
 	}
-
+	if (this->json.count("PidFile") == 0) {
+		char buf[256]={0};
+		sprintf(buf, "/var/run/%s.pid", this->json["Label"].get<std::string>().c_str());
+		this->json["PidFile"] = buf;
+		memset(&buf, 0, sizeof(buf));
+	}
 
 	// Add default values for missing keys
 	for (nlohmann::json::iterator it = default_json.begin(); it != default_json.end(); ++it) {

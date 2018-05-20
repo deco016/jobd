@@ -76,6 +76,15 @@ void ipc_request_handler(void) {
 			manager.runPendingJobs();
 			result["FIXME"] = "TODO";
 			response.setResult(result);
+		} else if (method == "refresh") {
+			json result;
+			manager.refreshJob(request.getParam(0));
+			result["FIXME"] = "TODO";
+			response.setResult(result);
+		} else if (method == "status") {
+			json result;
+			result["status"] = manager.getStatus(request.getParam(0));
+			response.setResult(result);
 		} else if (method == "list") {
 			json result;
 			manager.listAllJobs(result);
@@ -100,7 +109,12 @@ void ipc_request_handler(void) {
 			manager.unloadJob(request.getParam(0));
 			result["FIXME"] = "TODO";
 			response.setResult(result);
-		} else {
+		} else if (method == "restart") {
+			json result;
+			manager.restartJob(request.getParam(0));
+			result["FIXME"] = "TODO";
+			response.setResult(result);
+		}  else {
 			log_error("bad method");
 			// TODO: response.setError();
 		}

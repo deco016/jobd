@@ -132,6 +132,7 @@ public:
 		return state;
 	}
 
+	const std::string getManifestPath();
 	const std::string getStateString() const
 	{
 		switch (state) {
@@ -185,7 +186,7 @@ public:
 		if (enabled && this->isRunnable()) {
 			this->run();
 		} else if (!enabled && this->getState() == JOB_STATE_RUNNING) {
-			this->unload();
+			this->kill();
 		}
 	}
 
@@ -197,6 +198,7 @@ public:
 	void clearFault();
 	void load();
 	void run();
+	void kill();
 	void unload();
 	void releaseAllResources();
 
@@ -226,7 +228,6 @@ private:
 	gid_t gid;
 	std::string home_directory;
 	std::string shell;
-
 	/** KeepAlive=true ? After this walltime, the job should be restarted */
 	time_t restart_after = 0;
 
@@ -249,6 +250,8 @@ private:
 	void redirect_stdio();
 	void setup_environment();
 	void exec();
+	void writePidFile();
+	void setJobRuning(pid_t pid);
 };
 
 extern const int launchd_signals[];

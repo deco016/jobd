@@ -29,7 +29,7 @@ jobd_DEPENDS="../libjob/libjob.a $VENDOR_DEPENDS"
 uname=$(uname)
 if [ "`uname`" = 'FreeBSD' ] ; then
         #jobd_SOURCES="${jobd_SOURCES} jail.cpp"
-        jobd_LDADD="${jobd_LDADD} -ljail"
+        jobd_LDADD="${jobd_LDADD} -ljail -lutil"
 fi
 
 if [ -n "$manpage_generator" ] ; then
